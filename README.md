@@ -1,7 +1,7 @@
 # doc-insights
 ## How it works
 
-- Create a chat engine with[LlamaIndex](https://www.llamaindex.ai/) to answer question based on a set of documents.
+- Create a chat engine with [LlamaIndex](https://www.llamaindex.ai/) to answer question based on a set of pre-selected documents.
 - Leverage [Streamlit](https://streamlit.io/) for file uploads and interactive communication with the engine.
 
 ## Deployment
