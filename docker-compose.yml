@@ -1,0 +1,15 @@
+version: "2"
+
+services:
+
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app:/app/app
+    environment:
+      - XINFERENCE_SERVER_ENDPOINT=http://maas:8001
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM=openai
+      - EMBEDDING=openai
