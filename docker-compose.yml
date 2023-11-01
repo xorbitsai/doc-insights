@@ -4,12 +4,14 @@ services:
 
   app:
     build: .
+    network_mode: "host"
     ports:
       - "8501:8501"
     volumes:
       - ./app:/app/app
     environment:
-      - XINFERENCE_SERVER_ENDPOINT=http://maas:8001
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - LLM=openai
-      - EMBEDDING=openai
+      - LLM=xinference
+      - EMBEDDING=xinference
+      - XINFERENCE_SERVER_ENDPOINT=http://127.0.0.1:9997
+      - XINFERENCE_EMBEDDING_MODEL_UID=031ea20e-7889-11ee-b84e-047c1643e4f5
+      - XINFERENCE_LLM_MODEL_UID=adc14cc0-7889-11ee-b84e-047c1643e4f5

@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field, validator
-from datetime import datetime
-from typing import List, Optional, Dict, Union, Any
 import uuid
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
 
 class Base(BaseModel):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, description="Unique identifier")
@@ -10,11 +12,11 @@ class Base(BaseModel):
 
 
 class FundDocumentMetadata(BaseModel):
-  fund_name: Optional[str]
-  fund_ticker: Optional[str]
-  document_description: Optional[str]
+    fund_name: Optional[str]
+    fund_ticker: Optional[str]
+    document_description: Optional[str]
 
 
 class Document(Base):
-  url: str
-  metadata: Optional[FundDocumentMetadata]
+    url: str
+    metadata: Optional[FundDocumentMetadata]

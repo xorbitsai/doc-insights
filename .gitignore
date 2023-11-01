@@ -6,3 +6,5 @@ storage
 .streamlit
 __pypackages__/
 __pycache__/
+.idea/
+poetry.lock
