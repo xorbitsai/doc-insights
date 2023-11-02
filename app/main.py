@@ -5,6 +5,7 @@ import tempfile
 import streamlit as st
 from llama_index.llms import ChatMessage, MessageRole
 
+from app.chat.constants import ENV_CHAT_HISTORY_KEEP_CNT
 from app.chat.engine import get_chat_engine
 from app.log import Utf8DecoderFormatter
 from app.models.schema import Document, FundDocumentMetadata
@@ -79,6 +80,7 @@ def main():
     init_engine()
 
     history = []
+    keep_cnt = int(os.environ.get(ENV_CHAT_HISTORY_KEEP_CNT, 10))
     for msg in st.session_state.messages:
         role = msg["role"]
         content = msg["content"]
@@ -89,6 +91,7 @@ def main():
                 content=content,
             )
         )
+    history = history[-keep_cnt:]
 
     if prompt := st.chat_input(placeholder=f"请问我任何问题"):
         st.session_state.messages.append({"role": "user", "content": prompt})
