@@ -41,6 +41,8 @@ def get_llm():
         llm = Xinference(
             server_url=os.getenv("XINFERENCE_SERVER_ENDPOINT"),
             model_uid=os.getenv("XINFERENCE_LLM_MODEL_UID"),
+            temperature=0.0,
+            max_tokens=1024,
         )
     else:
         raise ValueError(f"Unknown LLM type {llm_type}")
@@ -99,7 +101,7 @@ def get_service_context(callback_handlers):
     )
 
 
-def get_stateless_chat_engine(documents: List[DocumentSchema]) -> BaseChatEngine:
+def get_chat_engine(documents: List[DocumentSchema]) -> BaseChatEngine:
     """Custom a query engine for qa, retrieve all documents in one index."""
     llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 
@@ -125,6 +127,3 @@ def get_stateless_chat_engine(documents: List[DocumentSchema]) -> BaseChatEngine
         service_context=service_context,
     )
     return chat_engine
-
-
-get_chat_engine = get_stateless_chat_engine

@@ -30,6 +30,9 @@ def init_page():
 def init_message_history():
     clear_button = st.sidebar.button("清空对话", key="clear")
     if clear_button or "messages" not in st.session_state:
+        # reset chat engine
+        if "engine" in st.session_state:
+            st.session_state.engine.reset()
         st.session_state.messages = [
             {"role": "assistant", "content": "我是小助手，请问你有什么问题想问？"},
         ]
