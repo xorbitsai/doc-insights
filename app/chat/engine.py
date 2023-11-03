@@ -8,23 +8,36 @@ from langchain.llms import OpenAI, Xinference
 from llama_index import ServiceContext, VectorStoreIndex
 from llama_index.callbacks import LlamaDebugHandler
 from llama_index.callbacks.base import CallbackManager
-from llama_index.chat_engine import CondenseQuestionChatEngine
-from llama_index.chat_engine.types import BaseChatEngine
+from llama_index.chat_engine.types import BaseChatEngine, ChatMode
 from llama_index.embeddings import LangchainEmbedding
 from llama_index.embeddings.openai import (
     OpenAIEmbedding,
     OpenAIEmbeddingMode,
     OpenAIEmbeddingModelType,
 )
+from llama_index.memory import ChatMemoryBuffer
 from llama_index.node_parser import SimpleNodeParser
 from llama_index.text_splitter import SentenceSplitter
 
 from ..models.schema import Document as DocumentSchema
-from .constants import NODE_PARSER_CHUNK_OVERLAP, NODE_PARSER_CHUNK_SIZE
-from .qa_response_synth import get_custom_response_synthesizer, get_template
+from .constants import (
+    ENV_CHAT_HISTORY_KEEP_CNT,
+    ENV_LLM_MAX_TOKENS,
+    NODE_PARSER_CHUNK_OVERLAP,
+    NODE_PARSER_CHUNK_SIZE,
+)
+from .qa_response_synth import get_sys_prompt
 from .utils import fetch_and_read_documents
 
 logger = logging.getLogger(__name__)
+
+
+def get_llm_max_tokens():
+    return int(os.environ.get(ENV_LLM_MAX_TOKENS, 1024))
+
+
+def get_history_count():
+    return int(os.environ.get(ENV_CHAT_HISTORY_KEEP_CNT, 10))
 
 
 def get_llm():
@@ -42,7 +55,7 @@ def get_llm():
             server_url=os.getenv("XINFERENCE_SERVER_ENDPOINT"),
             model_uid=os.getenv("XINFERENCE_LLM_MODEL_UID"),
             temperature=0.0,
-            max_tokens=1024,
+            max_tokens=get_llm_max_tokens(),
         )
     else:
         raise ValueError(f"Unknown LLM type {llm_type}")
@@ -113,17 +126,14 @@ def get_chat_engine(documents: List[DocumentSchema]) -> BaseChatEngine:
         llama_index_docs,
         service_context=service_context,
     )
-    kwargs = {"similarity_top_k": 3}
 
-    query_engine = index.as_query_engine(
-        response_synthesizer=get_custom_response_synthesizer(
-            service_context=service_context, documents=documents
-        ),
-        **kwargs,
+    memory = ChatMemoryBuffer.from_defaults(
+        token_limit=get_llm_max_tokens() * get_history_count()
     )
-    chat_engine = CondenseQuestionChatEngine.from_defaults(
-        query_engine=query_engine,
-        condense_question_prompt=get_template(),
-        service_context=service_context,
+
+    chat_engine = index.as_chat_engine(
+        chat_mode=ChatMode.CONTEXT,
+        memory=memory,
+        system_prompt=get_sys_prompt(),
     )
     return chat_engine
