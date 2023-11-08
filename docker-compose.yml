@@ -10,8 +10,8 @@ services:
     volumes:
       - ./app:/app/app
     environment:
-      - LLM=xinference
-      - EMBEDDING=xinference
+      - LLM=openai
+      - EMBEDDING=openai
       - XINFERENCE_SERVER_ENDPOINT=http://127.0.0.1:9997
       - XINFERENCE_EMBEDDING_MODEL_UID=20901038-79f7-11ee-8da3-047c1643e4f5
       - XINFERENCE_LLM_MODEL_UID=280557a6-79f7-11ee-8da3-047c1643e4f5
