@@ -4,7 +4,7 @@ FROM python:3.9
 WORKDIR /app
 
 # Install Poetry
-RUN pip install poetry
+RUN pip install poetry xinference
 
 # Copy pyproject.toml and poetry.lock files into the container
 COPY pyproject.toml poetry.lock /app/
