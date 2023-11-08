@@ -4,7 +4,8 @@ from typing import List
 
 import tiktoken
 from langchain.embeddings import XinferenceEmbeddings
-from langchain.llms import OpenAI, Xinference
+from langchain.llms import Xinference
+from llama_index.llms import OpenAI
 from llama_index import ServiceContext, VectorStoreIndex
 from llama_index.callbacks import LlamaDebugHandler
 from llama_index.callbacks.base import CallbackManager
@@ -26,7 +27,7 @@ from .constants import (
     NODE_PARSER_CHUNK_OVERLAP,
     NODE_PARSER_CHUNK_SIZE,
 )
-from .qa_response_synth import get_sys_prompt
+from .qa_response_synth import get_sys_prompt, get_context_prompt_template
 from .utils import fetch_and_read_documents
 
 logger = logging.getLogger(__name__)
@@ -134,6 +135,7 @@ def get_chat_engine(documents: List[DocumentSchema]) -> BaseChatEngine:
     chat_engine = index.as_chat_engine(
         chat_mode=ChatMode.CONTEXT,
         memory=memory,
+        context_template=get_context_prompt_template(documents),
         system_prompt=get_sys_prompt(),
     )
     return chat_engine

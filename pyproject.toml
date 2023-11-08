@@ -11,7 +11,7 @@ fastapi = "^0.70.0"
 streamlit = "^1.27.0"
 uvicorn = "^0.15.0"
 pypdf = "^3.5.2"
-llama-index = "^0.8.51"
+llama-index = "^0.8.64"
 nltk = "^3.8.1"
 
 [tool.poetry.dev-dependencies]
