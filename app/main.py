@@ -24,6 +24,13 @@ def init_page():
     st.sidebar.title("Options")
     st.warning("请先上传本地对话所使用的文档，文档格式为PDF")
     st.warning("索引不会持久化，下次进入时需要重新上传文件")
+    st.text_input(
+        '切分文本的块大小，如果遇到"context length exceeded"的问题，请尝试调小此值', 256, key="chunk_size"
+    )
+    st.text_input("切分文本时每个分块的重叠量，一般情况下请保持默认值", 10, key="chunk_overlap")
+    st.number_input(
+        "保留的历史对话轮数", min_value=1, max_value=20, value=5, step=1, key="history_cnt"
+    )
 
 
 def init_message_history():
@@ -72,7 +79,12 @@ def init_engine():
                     f"File {uploaded_file.name} has been written to {file_path}"
                 )
             with st.spinner("构建索引和初始化，对话即将开始，请耐心等待..."):
-                st.session_state.engine = get_chat_engine(documents)
+                st.session_state.engine = get_chat_engine(
+                    documents,
+                    st.session_state.chunk_size,
+                    st.session_state.chunk_overlap,
+                    st.session_state.history_cnt,
+                )
                 st.success("索引构建完毕!")
 
 
