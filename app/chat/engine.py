@@ -37,8 +37,8 @@ def get_llm_max_tokens():
     return int(os.environ.get(ENV_LLM_MAX_TOKENS, 1024))
 
 
-def get_history_count():
-    return int(os.environ.get(ENV_CHAT_HISTORY_KEEP_CNT, 10))
+def get_history_count(history_cnt):
+    return history_cnt or int(os.environ.get(ENV_CHAT_HISTORY_KEEP_CNT, 10))
 
 
 def get_llm():
@@ -116,7 +116,7 @@ def get_service_context(callback_handlers, chunk_size, chunk_overlap):
 
 
 def get_chat_engine(
-    documents: List[DocumentSchema], chunk_size, chunk_overlap
+    documents: List[DocumentSchema], chunk_size, chunk_overlap, history_cnt
 ) -> BaseChatEngine:
     """Custom a query engine for qa, retrieve all documents in one index."""
     llama_debug = LlamaDebugHandler(print_trace_on_end=True)
@@ -131,7 +131,7 @@ def get_chat_engine(
     )
 
     memory = ChatMemoryBuffer.from_defaults(
-        token_limit=get_llm_max_tokens() * get_history_count()
+        token_limit=get_llm_max_tokens() * get_history_count(history_cnt) * 2
     )
 
     chat_engine = index.as_chat_engine(
