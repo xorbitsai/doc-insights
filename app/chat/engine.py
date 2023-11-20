@@ -5,7 +5,6 @@ from typing import List
 import tiktoken
 from langchain.embeddings import XinferenceEmbeddings
 from langchain.llms import Xinference
-from llama_index.llms import OpenAI
 from llama_index import ServiceContext, VectorStoreIndex
 from llama_index.callbacks import LlamaDebugHandler
 from llama_index.callbacks.base import CallbackManager
@@ -16,6 +15,7 @@ from llama_index.embeddings.openai import (
     OpenAIEmbeddingMode,
     OpenAIEmbeddingModelType,
 )
+from llama_index.llms import OpenAI
 from llama_index.memory import ChatMemoryBuffer
 from llama_index.node_parser import SimpleNodeParser
 from llama_index.text_splitter import SentenceSplitter
@@ -27,7 +27,7 @@ from .constants import (
     NODE_PARSER_CHUNK_OVERLAP,
     NODE_PARSER_CHUNK_SIZE,
 )
-from .qa_response_synth import get_sys_prompt, get_context_prompt_template
+from .qa_response_synth import get_context_prompt_template, get_sys_prompt
 from .utils import fetch_and_read_documents
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ def get_embedding_model():
     return embedding
 
 
-def get_service_context(callback_handlers):
+def get_service_context(callback_handlers, chunk_size, chunk_overlap):
     callback_manager = CallbackManager(callback_handlers)
 
     embedding_model = get_embedding_model()
@@ -95,8 +95,8 @@ def get_service_context(callback_handlers):
 
     text_splitter = SentenceSplitter(
         separator=" ",
-        chunk_size=NODE_PARSER_CHUNK_SIZE,
-        chunk_overlap=NODE_PARSER_CHUNK_OVERLAP,
+        chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
+        chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
         paragraph_separator="\n\n\n",
         secondary_chunking_regex="[^,.;。]+[,.;。]?",
         tokenizer=tiktoken.encoding_for_model("gpt-3.5-turbo").encode,
@@ -115,11 +115,13 @@ def get_service_context(callback_handlers):
     )
 
 
-def get_chat_engine(documents: List[DocumentSchema]) -> BaseChatEngine:
+def get_chat_engine(
+    documents: List[DocumentSchema], chunk_size, chunk_overlap
+) -> BaseChatEngine:
     """Custom a query engine for qa, retrieve all documents in one index."""
     llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 
-    service_context = get_service_context([llama_debug])
+    service_context = get_service_context([llama_debug], chunk_size, chunk_overlap)
 
     llama_index_docs = fetch_and_read_documents(documents)
     logger.debug(llama_index_docs)
