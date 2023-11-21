@@ -140,9 +140,9 @@ def get_chat_engine(
     langchain_docs: List[LCDocument] = [d.to_langchain_format() for d in llama_index_docs]
 
 
-    text_splitter_src = "tiktoken"
+    TEXTS_SPLITTER_SRC = "tiktoken"
 
-    if text_splitter_src == "huggingface":
+    if TEXTS_SPLITTER_SRC == "huggingface":
         from transformers import GPT2TokenizerFast
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
         text_splitter = ChineseRecursiveTextSplitter.from_huggingface_tokenizer(
@@ -150,24 +150,19 @@ def get_chat_engine(
             chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
             chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
         )
-    elif text_splitter_src == "tiktoken":
+    elif TEXTS_SPLITTER_SRC == "tiktoken":
         text_splitter = ChineseRecursiveTextSplitter.from_tiktoken_encoder(
             encoding_name="gpt2",
             chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
             chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
         )
-    else:
-        raise Exception("text_splitter_src not supported")
-    
-    # text_splitter = ChineseRecursiveTextSplitter(
-    #     keep_separator=True,        
-    #     chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
-    #     chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
-    # )
+    else:        
+        text_splitter = ChineseRecursiveTextSplitter(
+            chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
+            chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
+        )
 
     docs = text_splitter.split_documents(langchain_docs)
-
-
 
     #docs = func_zh_title_enhance(docs)
 
