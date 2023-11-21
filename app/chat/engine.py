@@ -2,7 +2,6 @@ import logging
 import os
 from typing import List
 
-import tiktoken
 from langchain.embeddings import XinferenceEmbeddings
 from langchain.llms import Xinference
 from llama_index import ServiceContext, VectorStoreIndex
@@ -36,7 +35,8 @@ from .constants import (
     NODE_PARSER_CHUNK_OVERLAP,
     NODE_PARSER_CHUNK_SIZE,
     VECTOR_SEARCH_TOP_K,
-    VECTOR_SEARCH_SIMILARITY_CUTOFF
+    VECTOR_SEARCH_SIMILARITY_CUTOFF,
+    TEXTS_SPLITTER_SRC
 )
 from .qa_response_synth import get_context_prompt_template, get_sys_prompt
 from .utils import fetch_and_read_documents
@@ -98,50 +98,20 @@ def get_embedding_model():
     return embedding
 
 
-def get_service_context(callback_handlers, chunk_size, chunk_overlap):
+def get_service_context(callback_handlers):
     callback_manager = CallbackManager(callback_handlers)
 
     embedding_model = get_embedding_model()
     llm = get_llm()
 
-    node_parser = LangchainNodeParser(ChineseRecursiveTextSplitter(
-        keep_separator=False,        
-        chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
-        chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
-    ))
-
-    # node_parser = SentenceSplitter(
-    #     separator=" ",
-    #     chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
-    #     chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
-    #     paragraph_separator="\n\n\n",
-    #     secondary_chunking_regex="[^,.;。]+[,.;。]?",
-    #     tokenizer=tiktoken.encoding_for_model("gpt-3.5-turbo").encode,
-    # )
-
     return ServiceContext.from_defaults(
         callback_manager=callback_manager,
         llm=llm,
         embed_model=embedding_model,
-        node_parser=node_parser,
     )
 
 
-def get_chat_engine(
-    documents: List[DocumentSchema], chunk_size, chunk_overlap, history_cnt
-) -> BaseChatEngine:
-    """Custom a query engine for qa, retrieve all documents in one index."""
-    llama_debug = LlamaDebugHandler(print_trace_on_end=True)
-
-    service_context = get_service_context([llama_debug], chunk_size, chunk_overlap)
-
-    llama_index_docs = fetch_and_read_documents(documents)
-
-    langchain_docs: List[LCDocument] = [d.to_langchain_format() for d in llama_index_docs]
-
-
-    TEXTS_SPLITTER_SRC = "tiktoken"
-
+def get_text_splitter(chunk_size, chunk_overlap):
     if TEXTS_SPLITTER_SRC == "huggingface":
         from transformers import GPT2TokenizerFast
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
@@ -161,7 +131,21 @@ def get_chat_engine(
             chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
             chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
         )
+    return text_splitter
 
+
+def get_chat_engine(
+    documents: List[DocumentSchema], chunk_size, chunk_overlap, history_cnt
+) -> BaseChatEngine:
+    """Custom a query engine for qa, retrieve all documents in one index."""
+    llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+
+    service_context = get_service_context([llama_debug], chunk_size, chunk_overlap)
+
+    llama_index_docs = fetch_and_read_documents(documents)
+    langchain_docs: List[LCDocument] = [d.to_langchain_format() for d in llama_index_docs]
+
+    text_splitter = get_text_splitter(chunk_size, chunk_overlap)
     docs = text_splitter.split_documents(langchain_docs)
 
     #docs = func_zh_title_enhance(docs)
@@ -186,7 +170,6 @@ def get_chat_engine(
         node_postprocessors=[
             SimilarityPostprocessor(similarity_cutoff=VECTOR_SEARCH_SIMILARITY_CUTOFF)
         ]
-
     )
     return nodes, chat_engine
 
@@ -200,7 +183,9 @@ def get_engine_for_summarization(
 
     llama_index_docs = fetch_and_read_documents(documents)
 
-    nodes = service_context.node_parser.get_nodes_from_documents(
+    # wrap langchain's text spliter
+    node_parser = LangchainNodeParser(get_text_splitter(chunk_size, chunk_overlap))
+    nodes = node_parser.get_nodes_from_documents(
         llama_index_docs, show_progress=True
     )
 
