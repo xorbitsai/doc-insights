@@ -18,13 +18,7 @@ from llama_index.embeddings.openai import (
 )
 from llama_index.llms import OpenAI
 from llama_index.memory import ChatMemoryBuffer
-from llama_index.node_parser import (
-    SentenceSplitter, 
-    TokenTextSplitter,
-    LangchainNodeParser
-)
 from llama_index import Document
-from llama_index.bridge.langchain import Document as LCDocument
 from .splitters import ChineseRecursiveTextSplitter
 from .zk_title_enhance import zh_title_enhance as func_zh_title_enhance
 
@@ -140,13 +134,12 @@ def get_chat_engine(
     """Custom a query engine for qa, retrieve all documents in one index."""
     llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 
-    service_context = get_service_context([llama_debug], chunk_size, chunk_overlap)
+    service_context = get_service_context([llama_debug])
 
-    llama_index_docs = fetch_and_read_documents(documents)
-    langchain_docs: List[LCDocument] = [d.to_langchain_format() for d in llama_index_docs]
+    docs = fetch_and_read_documents(documents)
 
     text_splitter = get_text_splitter(chunk_size, chunk_overlap)
-    docs = text_splitter.split_documents(langchain_docs)
+    docs = text_splitter.split_documents(docs)
 
     #docs = func_zh_title_enhance(docs)
 
@@ -179,15 +172,13 @@ def get_engine_for_summarization(
 ) -> BaseChatEngine:
     llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 
-    service_context = get_service_context([llama_debug], chunk_size, chunk_overlap)
+    service_context = get_service_context([llama_debug])
 
-    llama_index_docs = fetch_and_read_documents(documents)
+    docs = fetch_and_read_documents(documents)
 
-    # wrap langchain's text spliter
-    node_parser = LangchainNodeParser(get_text_splitter(chunk_size, chunk_overlap))
-    nodes = node_parser.get_nodes_from_documents(
-        llama_index_docs, show_progress=True
-    )
+    text_splitter = get_text_splitter(chunk_size, chunk_overlap)
+    docs = text_splitter.split_documents(docs)
+    nodes = [Document.from_langchain_format(d) for d in docs]
 
     index = SummaryIndex(
         nodes=nodes,

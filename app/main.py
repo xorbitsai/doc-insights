@@ -31,18 +31,14 @@ def init_message_history():
 def init_node_preview():
     if "nodes" in st.session_state:
         with st.expander("文本分块预览"):
-            import pandas as pd
             formatted_nodes = [
                 {
-                    "page": n.metadata["page_label"],
-                    "filename": n.metadata["file_name"],
                     "text": n.text,
                     "strlen": len(n.text),
                     "metadata": n.metadata
                 } for n in st.session_state.nodes
             ]
-            df = pd.DataFrame(formatted_nodes)
-            st.write(df)
+            st.dataframe(formatted_nodes)
 
 def init_engine():
     if "engine" not in st.session_state:
@@ -191,13 +187,13 @@ def kb_chat():
 
                 for source_node in engine_response.source_nodes:
                     node_id = source_node.node.node_id or "None"
-                    file_name = source_node.node.metadata["file_name"] or "None"
-                    page_label = source_node.node.metadata["page_label"] or "None"
+                    file_name = source_node.node.metadata["source"]
+                    page_label = source_node.node.metadata["page"]
 
                     shortened_text = f'来源：《{file_name[:25]} ...》"第{page_label}页'
                     with st.expander(shortened_text):
                         st.caption(f"Node id: {node_id}")
-                        st.caption(f"File: {file_name}")
+                        st.caption(f"source: {file_name}")
                         st.caption(f"Score: {source_node.score}")
                         st.caption(f"Content: {source_node.node.get_content()}")
 
