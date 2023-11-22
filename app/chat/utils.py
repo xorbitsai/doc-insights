@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List
 
 from langchain.document_loaders import PyPDFLoader
+from langchain.document_loaders import Docx2txtLoader
 from langchain.docstore.document import Document
 
 from ..models.schema import Document as DocumentSchema
@@ -26,5 +27,11 @@ def fetch_and_read_documents(
 ) -> List[Document]:
     loaded_documents = []
     for doc in documents:
-        loaded_documents.extend(PyPDFLoader(doc.url).load())
+        if doc.url.endswith(".pdf"):
+            loaded = PyPDFLoader(doc.url).load()
+        elif doc.url.endswith(".docx"):
+            loaded = Docx2txtLoader(doc.url).load()
+        else:
+            raise Exception("file type not supported")
+        loaded_documents.extend(loaded)    
     return loaded_documents
