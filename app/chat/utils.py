@@ -29,7 +29,7 @@ def fetch_and_read_documents(
     for doc in documents:
         if doc.url.endswith(".pdf"):
             loaded = PyPDFLoader(doc.url).load()
-        elif doc.url.endswith(".docx"):
+        elif doc.url.endswith(".docx") or doc.url.endswith(".doc"):
             loaded = Docx2txtLoader(doc.url).load()
         else:
             raise Exception("file type not supported")

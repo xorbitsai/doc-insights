@@ -47,7 +47,7 @@ def init_engine():
             st.warning("请先上传本地对话所使用的文档，文档格式为PDF")
             st.warning("索引不会持久化，下次进入时需要重新上传文件")
             uploaded_files = st.file_uploader(
-                "为本次对话提供相关的文档（可以是多个文档）", type=["pdf", "docx"], accept_multiple_files=True
+                "为本次对话提供相关的文档（可以是多个文档）", type=["pdf", "docx", "doc"], accept_multiple_files=True
             )
 
             with st.expander("配置", expanded=True):
