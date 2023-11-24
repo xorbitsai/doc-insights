@@ -2,10 +2,11 @@ import logging
 import os
 from typing import List
 
-import tiktoken
 from langchain.embeddings import XinferenceEmbeddings
 from langchain.llms import Xinference
 from llama_index import ServiceContext, VectorStoreIndex
+from llama_index.indices.postprocessor import SimilarityPostprocessor
+from llama_index.indices import SummaryIndex
 from llama_index.callbacks import LlamaDebugHandler
 from llama_index.callbacks.base import CallbackManager
 from llama_index.chat_engine.types import BaseChatEngine, ChatMode
@@ -17,8 +18,9 @@ from llama_index.embeddings.openai import (
 )
 from llama_index.llms import OpenAI
 from llama_index.memory import ChatMemoryBuffer
-from llama_index.node_parser import SimpleNodeParser
-from llama_index.text_splitter import SentenceSplitter
+from llama_index import Document
+from .splitters import ChineseRecursiveTextSplitter
+from .zk_title_enhance import zh_title_enhance as func_zh_title_enhance
 
 from ..models.schema import Document as DocumentSchema
 from .constants import (
@@ -26,6 +28,9 @@ from .constants import (
     ENV_LLM_MAX_TOKENS,
     NODE_PARSER_CHUNK_OVERLAP,
     NODE_PARSER_CHUNK_SIZE,
+    VECTOR_SEARCH_TOP_K,
+    VECTOR_SEARCH_SIMILARITY_CUTOFF,
+    TEXTS_SPLITTER_SRC
 )
 from .qa_response_synth import get_context_prompt_template, get_sys_prompt
 from .utils import fetch_and_read_documents
@@ -87,32 +92,40 @@ def get_embedding_model():
     return embedding
 
 
-def get_service_context(callback_handlers, chunk_size, chunk_overlap):
+def get_service_context(callback_handlers):
     callback_manager = CallbackManager(callback_handlers)
 
     embedding_model = get_embedding_model()
     llm = get_llm()
 
-    text_splitter = SentenceSplitter(
-        separator=" ",
-        chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
-        chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
-        paragraph_separator="\n\n\n",
-        secondary_chunking_regex="[^,.;。]+[,.;。]?",
-        tokenizer=tiktoken.encoding_for_model("gpt-3.5-turbo").encode,
-    )
-
-    node_parser = SimpleNodeParser.from_defaults(
-        text_splitter=text_splitter,
-        callback_manager=callback_manager,
-    )
-
     return ServiceContext.from_defaults(
         callback_manager=callback_manager,
         llm=llm,
         embed_model=embedding_model,
-        node_parser=node_parser,
     )
+
+
+def get_text_splitter(chunk_size, chunk_overlap):
+    if TEXTS_SPLITTER_SRC == "huggingface":
+        from transformers import GPT2TokenizerFast
+        tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+        text_splitter = ChineseRecursiveTextSplitter.from_huggingface_tokenizer(
+            tokenizer=tokenizer,
+            chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
+            chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
+        )
+    elif TEXTS_SPLITTER_SRC == "tiktoken":
+        text_splitter = ChineseRecursiveTextSplitter.from_tiktoken_encoder(
+            encoding_name="gpt2",
+            chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
+            chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
+        )
+    else:        
+        text_splitter = ChineseRecursiveTextSplitter(
+            chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
+            chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
+        )
+    return text_splitter
 
 
 def get_chat_engine(
@@ -121,12 +134,19 @@ def get_chat_engine(
     """Custom a query engine for qa, retrieve all documents in one index."""
     llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 
-    service_context = get_service_context([llama_debug], chunk_size, chunk_overlap)
+    service_context = get_service_context([llama_debug])
 
-    llama_index_docs = fetch_and_read_documents(documents)
-    logger.debug(llama_index_docs)
-    index = VectorStoreIndex.from_documents(
-        llama_index_docs,
+    docs = fetch_and_read_documents(documents)
+
+    text_splitter = get_text_splitter(chunk_size, chunk_overlap)
+    docs = text_splitter.split_documents(docs)
+
+    #docs = func_zh_title_enhance(docs)
+
+    nodes = [Document.from_langchain_format(d) for d in docs]
+
+    index = VectorStoreIndex(
+        nodes=nodes,
         service_context=service_context,
     )
 
@@ -139,5 +159,34 @@ def get_chat_engine(
         memory=memory,
         context_template=get_context_prompt_template(documents),
         system_prompt=get_sys_prompt(),
+        similarity_top_k=VECTOR_SEARCH_TOP_K,
+        node_postprocessors=[
+            SimilarityPostprocessor(similarity_cutoff=VECTOR_SEARCH_SIMILARITY_CUTOFF)
+        ]
     )
-    return chat_engine
+    return nodes, chat_engine
+
+
+def get_engine_for_summarization(
+    documents: List[DocumentSchema], chunk_size, chunk_overlap        
+) -> BaseChatEngine:
+    llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+
+    service_context = get_service_context([llama_debug])
+
+    docs = fetch_and_read_documents(documents)
+
+    text_splitter = get_text_splitter(chunk_size, chunk_overlap)
+    docs = text_splitter.split_documents(docs)
+    nodes = [Document.from_langchain_format(d) for d in docs]
+
+    index = SummaryIndex(
+        nodes=nodes,
+        service_context=service_context,
+    )
+
+    chat_engine = index.as_query_engine(
+        response_mode="tree_summarize",
+        verbose=True,
+    )
+    return nodes, chat_engine
