@@ -33,5 +33,5 @@ def fetch_and_read_documents(
             loaded = Docx2txtLoader(doc.url).load()
         else:
             raise Exception("file type not supported")
-        loaded_documents.extend(loaded)    
+        loaded_documents.extend(loaded)
     return loaded_documents

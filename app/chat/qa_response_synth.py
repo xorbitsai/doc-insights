@@ -10,6 +10,7 @@ from llama_index.response_synthesizers.factory import get_response_synthesizer
 from .utils import build_title_for_document
 from ..models.schema import Document as DocumentSchema
 
+
 def get_custom_response_synthesizer(
     service_context: ServiceContext, documents
 ) -> BaseSynthesizer:
@@ -62,6 +63,7 @@ def get_context_prompt_template(documents: List[DocumentSchema]):
         "{context_str}"
         "\n---------------------\n"
     )
+
 
 def get_sys_prompt():
     return """
