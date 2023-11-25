@@ -1,10 +1,16 @@
 import logging
 import os
+import pickle
 from typing import List
 
 from langchain.embeddings import XinferenceEmbeddings
 from langchain.llms import Xinference
-from llama_index import ServiceContext, VectorStoreIndex
+from llama_index import (
+    ServiceContext,
+    StorageContext,
+    VectorStoreIndex,
+    load_index_from_storage,
+)
 from llama_index.indices.postprocessor import SimilarityPostprocessor
 from llama_index.indices import SummaryIndex
 from llama_index.callbacks import LlamaDebugHandler
@@ -30,7 +36,7 @@ from .constants import (
     NODE_PARSER_CHUNK_SIZE,
     VECTOR_SEARCH_TOP_K,
     VECTOR_SEARCH_SIMILARITY_CUTOFF,
-    TEXTS_SPLITTER_SRC
+    TEXTS_SPLITTER_SRC,
 )
 from .qa_response_synth import get_context_prompt_template, get_sys_prompt
 from .utils import fetch_and_read_documents
@@ -108,6 +114,7 @@ def get_service_context(callback_handlers):
 def get_text_splitter(chunk_size, chunk_overlap):
     if TEXTS_SPLITTER_SRC == "huggingface":
         from transformers import GPT2TokenizerFast
+
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
         text_splitter = ChineseRecursiveTextSplitter.from_huggingface_tokenizer(
             tokenizer=tokenizer,
@@ -120,7 +127,7 @@ def get_text_splitter(chunk_size, chunk_overlap):
             chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
             chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
         )
-    else:        
+    else:
         text_splitter = ChineseRecursiveTextSplitter(
             chunk_size=chunk_size or NODE_PARSER_CHUNK_SIZE,
             chunk_overlap=chunk_overlap or NODE_PARSER_CHUNK_OVERLAP,
@@ -129,7 +136,11 @@ def get_text_splitter(chunk_size, chunk_overlap):
 
 
 def get_chat_engine(
-    documents: List[DocumentSchema], chunk_size, chunk_overlap, history_cnt
+    documents: List[DocumentSchema],
+    chunk_size,
+    chunk_overlap,
+    history_cnt,
+    persist_dir: str = None,
 ) -> BaseChatEngine:
     """Custom a query engine for qa, retrieve all documents in one index."""
     llama_debug = LlamaDebugHandler(print_trace_on_end=True)
@@ -141,7 +152,7 @@ def get_chat_engine(
     text_splitter = get_text_splitter(chunk_size, chunk_overlap)
     docs = text_splitter.split_documents(docs)
 
-    #docs = func_zh_title_enhance(docs)
+    # docs = func_zh_title_enhance(docs)
 
     nodes = [Document.from_langchain_format(d) for d in docs]
 
@@ -149,6 +160,8 @@ def get_chat_engine(
         nodes=nodes,
         service_context=service_context,
     )
+    if persist_dir:
+        index.storage_context.persist(persist_dir)
 
     memory = ChatMemoryBuffer.from_defaults(
         token_limit=get_llm_max_tokens() * get_history_count(history_cnt) * 2
@@ -162,13 +175,44 @@ def get_chat_engine(
         similarity_top_k=VECTOR_SEARCH_TOP_K,
         node_postprocessors=[
             SimilarityPostprocessor(similarity_cutoff=VECTOR_SEARCH_SIMILARITY_CUTOFF)
-        ]
+        ],
+    )
+    return nodes, chat_engine
+
+
+def get_chat_engine_from_persistence(persist_dir: str, history_cnt: int):
+    """Custom a query engine for qa, retrieve all documents in one index."""
+    documents_file = os.path.join(persist_dir, "documents.pkl")
+    storage_dir = os.path.join(persist_dir, "storage")
+    llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+
+    service_context = get_service_context([llama_debug])
+    storage_context = StorageContext.from_defaults(persist_dir=storage_dir)
+    with open(documents_file, "rb") as f:
+        documents = pickle.load(f)
+
+    nodes = list(storage_context.docstore.docs.values())
+
+    index = load_index_from_storage(storage_context, service_context=service_context)
+    memory = ChatMemoryBuffer.from_defaults(
+        token_limit=get_llm_max_tokens() * get_history_count(history_cnt) * 2
+    )
+
+    chat_engine = index.as_chat_engine(
+        chat_mode=ChatMode.CONTEXT,
+        memory=memory,
+        context_template=get_context_prompt_template(documents),
+        system_prompt=get_sys_prompt(),
+        similarity_top_k=VECTOR_SEARCH_TOP_K,
+        node_postprocessors=[
+            SimilarityPostprocessor(similarity_cutoff=VECTOR_SEARCH_SIMILARITY_CUTOFF)
+        ],
     )
     return nodes, chat_engine
 
 
 def get_engine_for_summarization(
-    documents: List[DocumentSchema], chunk_size, chunk_overlap        
+    documents: List[DocumentSchema], chunk_size, chunk_overlap
 ) -> BaseChatEngine:
     llama_debug = LlamaDebugHandler(print_trace_on_end=True)
 

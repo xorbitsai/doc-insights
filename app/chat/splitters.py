@@ -2,8 +2,9 @@ import re
 from typing import List, Optional, Any
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
+
 def _split_text_with_regex_from_end(
-        text: str, separator: str, keep_separator: bool
+    text: str, separator: str, keep_separator: bool
 ) -> List[str]:
     # Now that we have the separator, split the text
     if separator:
@@ -23,11 +24,11 @@ def _split_text_with_regex_from_end(
 
 class ChineseRecursiveTextSplitter(RecursiveCharacterTextSplitter):
     def __init__(
-            self,
-            separators: Optional[List[str]] = None,
-            keep_separator: bool = True,
-            is_separator_regex: bool = True,
-            **kwargs: Any,
+        self,
+        separators: Optional[List[str]] = None,
+        keep_separator: bool = True,
+        is_separator_regex: bool = True,
+        **kwargs: Any,
     ) -> None:
         """Create a new TextSplitter."""
         super().__init__(keep_separator=keep_separator, **kwargs)
@@ -37,7 +38,7 @@ class ChineseRecursiveTextSplitter(RecursiveCharacterTextSplitter):
             "。|！|？",
             "\.\s|\!\s|\?\s",
             "；|;\s",
-            "，|,\s"
+            "，|,\s",
         ]
         self._is_separator_regex = is_separator_regex
 
@@ -54,7 +55,7 @@ class ChineseRecursiveTextSplitter(RecursiveCharacterTextSplitter):
                 break
             if re.search(_separator, text):
                 separator = _s
-                new_separators = separators[i + 1:]
+                new_separators = separators[i + 1 :]
                 break
 
         _separator = separator if self._is_separator_regex else re.escape(separator)
@@ -79,4 +80,8 @@ class ChineseRecursiveTextSplitter(RecursiveCharacterTextSplitter):
         if _good_splits:
             merged_text = self._merge_splits(_good_splits, _separator)
             final_chunks.extend(merged_text)
-        return [re.sub(r"\n{2,}", "\n", chunk.strip()) for chunk in final_chunks if chunk.strip()!=""]
+        return [
+            re.sub(r"\n{2,}", "\n", chunk.strip())
+            for chunk in final_chunks
+            if chunk.strip() != ""
+        ]
